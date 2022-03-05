@@ -1,0 +1,43 @@
+#!/bin/sh
+
+
+#curl "https://readlightnovels.net/?s=classroom+of+the+elite" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] [class="caption"] h3 text{}'
+#curl "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'ul[class="list-chapter"] [class="chapter-text"] text{}'
+#curl --data 'action=tw_ajax&type=pagination&id=1084701&page=3' https://readlightnovels.net/wp-admin/admin-ajax.php
+
+base_url="https://readlightnovels.net/"
+
+
+if [ -z "$*" ]; then
+#    printf "\033[1;35m%s" "light novel: "
+    read -p '> ' novel_title
+else
+    novel_title=$*
+    fi
+
+#read -p 'light novel: ' novel
+search=$(echo ${novel_title} | tr ' ' '+' )
+novel_caption=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] [class="caption"] h3 text{}' | awk 'NR==1{print}')
+novel_link=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] a attr{href}' | awk 'NR==1{print $1}')
+
+
+#printf '%s\n' $links
+#awk 'BEGIN {i = 1; while (i < 6) { print i; ++i } }'
+#for i in {1..10}; do
+#  printf '%s\n' $i $links
+#done
+
+
+#echo $links
+
+
+
+
+#### FETCHING CHAPTER LIST
+
+
+novel_id=$(curl -s $novel_link | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
+echo $novel_id
+#curl --data "action=tw_ajax&type=pagination&id=$novel_id&page=6" https://readlightnovels.net/wp-admin/admin-ajax.php | pup 'span[class] text{}'
+        #| pup 'chapter-text'
+        #| pup 'span text{}'
