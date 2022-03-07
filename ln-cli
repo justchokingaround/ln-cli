@@ -35,9 +35,12 @@ novel_link=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 c
 
 
 novel_id=$(curl -s $novel_link | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
-echo $novel_id
-curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'span[class="chapter-text"] text{}' | tail -n +3
-printf "%s\t%b\n" $(curl -s --data 'action=tw_ajax&type=pagination&id=1084701&page=2' https://readlightnovels.net/wp-admin/admin-ajax.php) 
+#echo $novel_id
+#curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'span[class="chapter-text"] text{}' | tail -n +3
+whale=$(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id&page=2" https://readlightnovels.net/wp-admin/admin-ajax.php) 
+echo $whale | grep chapter-text | pup 'text{}' | sed -f html-decode.sed 
+#|recode html..ascii
+#| rev | cut -c15- | rev
 
 #curl --data "action=tw_ajax&type=pagination&id=$novel_id&page=6" https://readlightnovels.net/wp-admin/admin-ajax.php | pup 'span[class] text{}'
         #| pup 'chapter-text'
@@ -45,3 +48,5 @@ printf "%s\t%b\n" $(curl -s --data 'action=tw_ajax&type=pagination&id=1084701&pa
 
 #curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'a span[class="chapter-text"] text{}'
 
+# DEPENDENCIES
+# pup, recode
