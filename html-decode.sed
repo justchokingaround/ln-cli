@@ -1,6 +1,10 @@
 # Custom ones for LNs
 s/\\u2019/'/g
 s/\\u2026/.../g
+s/\\u201c/"/g
+s/\\u201d/"/g
+s/\\u2019/'/g
+s/\\u024d/ō’/g
 
 # ASCII printable characters
 s/&#32;/ /g

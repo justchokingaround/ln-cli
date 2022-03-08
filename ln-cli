@@ -18,29 +18,44 @@ else
 #read -p 'light novel: ' novel
 search=$(echo ${novel_title} | tr ' ' '+' )
 novel_caption=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] [class="caption"] h3 text{}' | awk 'NR==1{print}')
-novel_link=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] a attr{href}' | awk 'NR==1{print $1}')
-
-
-#printf '%s\n' $links
-#awk 'BEGIN {i = 1; while (i < 6) { print i; ++i } }'
-#for i in {1..10}; do
-#  printf '%s\n' $i $links
-#done
-
-
-#echo $links
-
+novel_link=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] a attr{href}' | awk 'NR==1{print $1}'| rev | cut -c6- | rev)
+length=$(curl -s "$novel_link.html" | pup 'a[data-page]' | grep -B 1 Last | awk '{print $2}' | tr -d -c 0-9)
 
 #### FETCHING CHAPTER LIST
 
 
-novel_id=$(curl -s $novel_link | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
-#echo $novel_id
+novel_id=$(curl -s "$novel_link.html" | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
+INDEX=1
+while [ "$length" -gt "$INDEX" ]
+do
+    echo $(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id.html&page=$INDEX" https://readlightnovels.net/wp-admin/admin-ajax.php) | grep chapter-text | pup 'text{}' \
+        | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g' | tr ' ' '-' | sed -e '/^-/d' | grep . >> "$novel_title.txt"
+    INDEX=$(($INDEX+1))
+done
+
+nl -w4 -s'> ' "$novel_title.txt"
+
+read -p 'chapter number: ' selected_chapter
+chapter_name=$(cat "$novel_title".txt | awk 'FNR == '$selected_chapter' {print}')
+
+#echo $novel_link
+chapter_link="$novel_link/$chapter_name.html"
+test=$(curl -s "$chapter_link" \
+    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d')
+printf "$test" >> "$chapter_name.txt"
+
+echo $chapter_link
+
+nvim "$chapter_name.txt"
+
 #curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'span[class="chapter-text"] text{}' | tail -n +3
-whale=$(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id&page=2" https://readlightnovels.net/wp-admin/admin-ajax.php) 
-echo $whale | grep chapter-text | pup 'text{}' | sed -f html-decode.sed 
+#whale=$(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id&page=$length" https://readlightnovels.net/wp-admin/admin-ajax.php)
+
+
+
+#echo $whale | grep chapter-text | pup 'text{}' | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g'
+        #| rev | cut -c9- | rev
 #|recode html..ascii
-#| rev | cut -c15- | rev
 
 #curl --data "action=tw_ajax&type=pagination&id=$novel_id&page=6" https://readlightnovels.net/wp-admin/admin-ajax.php | pup 'span[class] text{}'
         #| pup 'chapter-text'
