@@ -38,22 +38,26 @@ do
     INDEX=$(($INDEX+1))
 done
 fi
-nl -w4 -s'> ' "$novel_title/$novel_title.txt" | less
 
-read -p 'chapter number: ' selected_chapter
-chapter_name=$(cat "$novel_title/$novel_title".txt | awk 'FNR == '$selected_chapter' {print}')
+#selected_chapter=$(printf "%d\n" $(nl -w4 -s'> ' "$novel_title/$novel_title.txt" | fzf | sed 's/>.*//'))
+#chapter_name=$(printf "%s\n" $("$novel_title/$novel_title.txt" | fzf))
+
+chapter_name=$(cat "$novel_title/$novel_title.txt" | fzf)
+
+#chapter_name=$(cat "$novel_title/$novel_title".txt | awk 'FNR == '$selected_chapter' {print}')
 
 chapter_link="$novel_link/$chapter_name.html"
 if [ ! -d "$novel_title/Chapters/" ]; then
     mkdir "$novel_title/Chapters"
 fi
+
 test=$(curl -s "$chapter_link" \
     | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
 printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
 
 echo $chapter_link
 
-nvim "$novel_title/Chapters/$chapter_name.txt"
+vim "$novel_title/Chapters/$chapter_name.txt"
 
 
 
