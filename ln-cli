@@ -25,28 +25,37 @@ length=$(curl -s "$novel_link.html" | pup 'a[data-page]' | grep -B 1 Last | awk 
 
 
 novel_id=$(curl -s "$novel_link.html" | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
+
+if [ ! -d "$novel_title" ]; then
+    mkdir "$novel_title"
+fi
+if [ ! -f "$novel_title/$novel_title.txt" ]; then
 INDEX=1
 while [ "$length" -gt "$INDEX" ]
 do
     echo $(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id.html&page=$INDEX" https://readlightnovels.net/wp-admin/admin-ajax.php) | grep chapter-text | pup 'text{}' \
-        | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g' | tr ' ' '-' | sed -e '/^-/d' | grep . >> "$novel_title.txt"
+        | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g' | tr ' ' '-' | sed -e '/^-/d' | grep . >> "$novel_title/$novel_title.txt"
     INDEX=$(($INDEX+1))
 done
-
-nl -w4 -s'> ' "$novel_title.txt"
+fi
+nl -w4 -s'> ' "$novel_title/$novel_title.txt" | less
 
 read -p 'chapter number: ' selected_chapter
-chapter_name=$(cat "$novel_title".txt | awk 'FNR == '$selected_chapter' {print}')
+chapter_name=$(cat "$novel_title/$novel_title".txt | awk 'FNR == '$selected_chapter' {print}')
 
-#echo $novel_link
 chapter_link="$novel_link/$chapter_name.html"
+if [ ! -d "$novel_title/Chapters/" ]; then
+    mkdir "$novel_title/Chapters"
+fi
 test=$(curl -s "$chapter_link" \
-    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d')
-printf "$test" >> "$chapter_name.txt"
+    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
+printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
 
 echo $chapter_link
 
-nvim "$chapter_name.txt"
+nvim "$novel_title/Chapters/$chapter_name.txt"
+
+
 
 #curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'span[class="chapter-text"] text{}' | tail -n +3
 #whale=$(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id&page=$length" https://readlightnovels.net/wp-admin/admin-ajax.php)
