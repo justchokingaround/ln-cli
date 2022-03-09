@@ -83,7 +83,8 @@ fetch_chapters(){
         INDEX=1
         while [ "$length" -gt "$INDEX" ]
         do
-            echo $(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id.html&page=$INDEX" https://readlightnovels.net/wp-admin/admin-ajax.php) | grep chapter-text | pup 'text{}' \
+            echo $(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id.html&page=$INDEX" https://readlightnovels.net/wp-admin/admin-ajax.php) \
+	    | grep chapter-text | pup 'text{}' \
                 | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g' | tr ' ' '-' | sed -e '/^-/d' | grep . >> "$chapter_list"
             INDEX=$(($INDEX+1))
         done
@@ -97,8 +98,8 @@ select_chapter(){
     chapter_text="$chapters_folder/'$chapter_name'.txt"
     [ -d "$chapters_folder" ] || mkdir "$chapters_folder"
 
-    printf "$(curl -s "$chapter_link" \
-        | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' \
+    printf "$(curl -s "$chapter_link" | pup 'p' text{} \
+	| sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' \
         | sed '/|/d' | tail -n +2)" > "$chapter_text"
 }
 
