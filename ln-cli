@@ -1,80 +1,126 @@
 #!/bin/sh
 
-
-#curl "https://readlightnovels.net/?s=classroom+of+the+elite" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] [class="caption"] h3 text{}'
-#curl "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'ul[class="list-chapter"] [class="chapter-text"] text{}'
-#curl --data 'action=tw_ajax&type=pagination&id=1084701&page=3' https://readlightnovels.net/wp-admin/admin-ajax.php
-
+# Version number
+version="1.0.0"
+github_source="https://raw.githubusercontent.com/iamchokerman/ln-cli/master/ln-cli"
 base_url="https://readlightnovels.net/"
+
+######################
+# Auxilary functions #
+######################
+
+show_version() {
+	echo "version ${version}"
+}
+
+die () {
+	err "$*"
+	exit 1
+}
+
+err () {
+	# display an error message to stderr (in red)
+	printf "\033[1;31m%s\033[0m\n" "$*" >&2
+}
+
+inf () {
+	# display an informational message (first argument in green, second in magenta)
+	printf "\033[1;32m%s \033[1;35m%s\033[0m\n" "$1" "$2"
+}
+
+prompt () {
+	# prompts the user with message in $1-2 ($1 in blue, $2 in magenta) and saves the input to the variables in $REPLY and $REPLY2
+	printf "\033[1;34m%s\033[1;35m%s\033[1;34m\033[0m" "$1" "$2"
+	read -r REPLY REPLY2
+}
+
+update_script () {
+	update="$(curl -s "https://raw.githubusercontent.com/iamchokerman/ln-cli/master/ln-cli" | diff -u "$0" -)"
+	if [ -z "$update" ]; then
+		inf "script is up to date :)"
+	else
+		if printf '%s\n' "$update" | patch "$0" - ; then
+			inf "script has been updated"
+		else
+			die "can't update for some reason!"
+		fi
+	fi
+}
 
 
 if [ -z "$*" ]; then
-#    printf "\033[1;35m%s" "light novel: "
-    read -p '> ' novel_title
+    prompt '> '
+    novel_title="$REPLY $REPLY2"
 else
     novel_title=$*
+fi
+
+
+#############
+# SEARCHING #
+#############
+
+search_ln () {
+    search=$(printf '%s' "${novel_title}" | tr ' ' '+' )
+    search_url="$base_url?s=$search"
+    novel_caption=$(curl -s "$search_url" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] [class="caption"] h3 text{}' \
+        | awk 'NR==1{print}')
+    novel_link=$(curl -s "$search_url" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] a attr{href}' \
+        | awk 'NR==1{print $1}'| rev | cut -c6- | rev)
+    length=$(curl -s "$novel_link.html" | pup 'a[data-page]' | grep -B 1 Last | awk '{print $2}' | tr -d -c 0-9)
+}
+
+####################
+# FETCH CHAPTER LIST
+####################
+
+fetch_chapters(){
+    novel_id=$(curl -s "$novel_link.html" | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
+    chapter_list="$novel_title/$novel_title.txt"
+    [ -d "$novel_title" ] || mkdir "$novel_title"
+
+    if [ ! -f "$chapter_list" ]; then
+        INDEX=1
+        while [ "$length" -gt "$INDEX" ]
+        do
+            echo $(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id.html&page=$INDEX" https://readlightnovels.net/wp-admin/admin-ajax.php) | grep chapter-text | pup 'text{}' \
+                | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g' | tr ' ' '-' | sed -e '/^-/d' | grep . >> "$chapter_list"
+            INDEX=$(($INDEX+1))
+        done
     fi
+}
 
-#read -p 'light novel: ' novel
-search=$(echo ${novel_title} | tr ' ' '+' )
-novel_caption=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] [class="caption"] h3 text{}' | awk 'NR==1{print}')
-novel_link=$(curl -s "$base_url?s=$search" | pup 'div[class="col-md-3 col-sm-6 col-xs-6 home-truyendecu"] a attr{href}' | awk 'NR==1{print $1}'| rev | cut -c6- | rev)
-length=$(curl -s "$novel_link.html" | pup 'a[data-page]' | grep -B 1 Last | awk '{print $2}' | tr -d -c 0-9)
+select_chapter(){
+    chapter_name=$(cat "$chapter_list" | fzf | sed -e 's/"//g')
+    chapter_link="$novel_link/$chapter_name.html"
+    chapters_folder="$novel_title/chapters/"
+    chapter_text="$chapters_folder/'$chapter_name'.txt"
+    [ -d "$chapters_folder" ] || mkdir "$chapters_folder"
 
-#### FETCHING CHAPTER LIST
+    printf "$(curl -s "$chapter_link" \
+        | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' \
+        | sed '/|/d' | tail -n +2)" > "$chapter_text"
+}
 
+open_chapter(){
+    $EDITOR "$chapter_text"
+}
 
-novel_id=$(curl -s "$novel_link.html" | pup 'div#wrap input#id_post attr{value}' | awk 'NR==1{print $1}')
+search_ln
+fetch_chapters
+select_chapter
+open_chapter
 
-if [ ! -d "$novel_title" ]; then
-    mkdir "$novel_title"
-fi
-if [ ! -f "$novel_title/$novel_title.txt" ]; then
-INDEX=1
-while [ "$length" -gt "$INDEX" ]
-do
-    echo $(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id.html&page=$INDEX" https://readlightnovels.net/wp-admin/admin-ajax.php) | grep chapter-text | pup 'text{}' \
-        | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g' | tr ' ' '-' | sed -e '/^-/d' | grep . >> "$novel_title/$novel_title.txt"
-    INDEX=$(($INDEX+1))
-done
-fi
+#chapter_name=$(grep -w -A 1 "$chapter_name" "$novel_title/$novel_title.txt" | grep -v $chapter_name)
+#chapter_link="$novel_link/$chapter_name.html"
+#
+#test=$(curl -s "$chapter_link" \
+#    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
+#printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
+#
+#echo $chapter_link
 
-#selected_chapter=$(printf "%d\n" $(nl -w4 -s'> ' "$novel_title/$novel_title.txt" | fzf | sed 's/>.*//'))
-#chapter_name=$(printf "%s\n" $("$novel_title/$novel_title.txt" | fzf))
-
-chapter_name=$(cat "$novel_title/$novel_title.txt" | fzf)
-
-#chapter_name=$(cat "$novel_title/$novel_title".txt | awk 'FNR == '$selected_chapter' {print}')
-
-chapter_link="$novel_link/$chapter_name.html"
-if [ ! -d "$novel_title/Chapters/" ]; then
-    mkdir "$novel_title/Chapters"
-fi
-
-test=$(curl -s "$chapter_link" \
-    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
-printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
-
-echo $chapter_link
-
-vim "$novel_title/Chapters/$chapter_name.txt"
-
-
-
-#curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'span[class="chapter-text"] text{}' | tail -n +3
-#whale=$(curl -s --data "action=tw_ajax&type=pagination&id=$novel_id&page=$length" https://readlightnovels.net/wp-admin/admin-ajax.php)
-
-
-
-#echo $whale | grep chapter-text | pup 'text{}' | sed -f html-decode.sed | sed -e 's/^<span>//g' -e 's/<\\\/span>$//g'
-        #| rev | cut -c9- | rev
-#|recode html..ascii
-
-#curl --data "action=tw_ajax&type=pagination&id=$novel_id&page=6" https://readlightnovels.net/wp-admin/admin-ajax.php | pup 'span[class] text{}'
-        #| pup 'chapter-text'
-        #| pup 'span text{}'
-
-#curl -s "https://readlightnovels.net/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e.html" | pup 'a span[class="chapter-text"] text{}'
+#$EDITOR "$novel_title/Chapters/$chapter_name.txt"
 
 # DEPENDENCIES
-# pup, recode
+# pup
