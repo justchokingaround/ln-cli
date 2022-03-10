@@ -18,6 +18,23 @@ die () {
 	exit 1
 }
 
+update_script () {
+	update="$(curl -s "https://raw.githubusercontent.com/iamchokerman/ln-cli/master/ln-cli" | diff -u "$0" -)"
+	if [ -z "$update" ]; then
+		inf "script is up to date :)"
+	else
+		if printf '%s\n' "$update" | patch "$0" - ; then
+			inf "script has been updated"
+		else
+			die "can't update for some reason!"
+		fi
+	fi
+}
+
+###############
+# TEXT OUTPUT #
+###############
+
 err () {
 	# display an error message to stderr (in red)
 	printf "\033[1;31m%s\033[0m\n" "$*" >&2
@@ -34,19 +51,26 @@ prompt () {
 	read -r REPLY REPLY2
 }
 
-update_script () {
-	update="$(curl -s "https://raw.githubusercontent.com/iamchokerman/ln-cli/master/ln-cli" | diff -u "$0" -)"
-	if [ -z "$update" ]; then
-		inf "script is up to date :)"
-	else
-		if printf '%s\n' "$update" | patch "$0" - ; then
-			inf "script has been updated"
-		else
-			die "can't update for some reason!"
-		fi
-	fi
+menu_line_even () {
+	# displays an even (cyan) line of a menu line with $2 as an indicator in [] and $1 as the option
+	printf "\033[1;34m(\033[1;36m%s\033[1;34m) \033[1;36m%s\033[0m\n" "$2" "$1"
 }
 
+menu_line_odd() {
+	# displays an odd (magenta) line of a menu line with $2 as an indicator in [] and $1 as the option
+	printf "\033[1;35m(\033[1;35m%s\033[1;35m) \033[1;35m%s\033[0m\n" "$2" "$1"
+}
+
+menu_line_alternate() {
+	menu_line_parity=${menu_line_parity:-0}
+	if [ "$menu_line_parity" -eq 0 ]; then
+		menu_line_odd "$1" "$2"
+		menu_line_parity=1
+	else
+		menu_line_even "$1" "$2"
+		menu_line_parity=0
+	fi
+}
 
 if [ -z "$*" ]; then
     prompt '> '
@@ -107,10 +131,71 @@ open_chapter(){
     $EDITOR "$chapter_text"
 }
 
+next_chapter (){
+chapter_name=$(grep -w -A 1 "$chapter_name" "$novel_title/$novel_title.txt" | grep -v $chapter_name)
+chapter_link="$novel_link/$chapter_name.html"
+test=$(curl -s "$chapter_link" \
+    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
+printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
+$EDITOR "$novel_title/Chapters/$chapter_name.txt"
+}
+
+previous_chapter (){
+chapter_name=$(grep -w -B 1 "$chapter_name" "$novel_title/$novel_title.txt" | grep -v $chapter_name)
+chapter_link="$novel_link/$chapter_name.html"
+test=$(curl -s "$chapter_link" \
+    | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
+printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
+$EDITOR "$novel_title/Chapters/$chapter_name.txt"
+}
+
+
 search_ln
 fetch_chapters
 select_chapter
 open_chapter
+
+while :; do
+    tput clear
+    menu_line_alternate "next" "n"
+    menu_line_alternate "previous" "p"
+    menu_line_alternate "chapter" "s"
+    menu_line_alternate "reopen" "r"
+    menu_line_alternate "quit" "q" && printf "\n"
+    prompt "> "
+	choice="$REPLY"
+	case $choice in
+        n)
+            tput clear
+            next_chapter
+            ;;
+        p)
+            tput clear
+            previous_chapter
+            ;;
+        s)
+            tput clear
+            select_chapter
+            open_chapter
+            ;;
+        r)
+            tput clear
+            open_chapter
+            ;;
+        q)
+            break
+            ;;
+        *)
+            tput clear
+			err "nice choke, try again"
+			continue
+            ;;
+    esac
+done
+
+
+
+#du -sh "$novel_title" | awk '{print $1}'
 
 #chapter_name=$(grep -w -A 1 "$chapter_name" "$novel_title/$novel_title.txt" | grep -v $chapter_name)
 #chapter_link="$novel_link/$chapter_name.html"
