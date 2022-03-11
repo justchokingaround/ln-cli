@@ -5,6 +5,8 @@ version="1.0.0"
 github_source="https://raw.githubusercontent.com/iamchokerman/ln-cli/master/ln-cli"
 base_url="https://readlightnovels.net/"
 
+
+
 ######################
 # Auxilary functions #
 ######################
@@ -119,9 +121,11 @@ select_chapter(){
     chapter_name=$(cat "$chapter_list" | fzf | sed -e 's/"//g')
     chapter_link="$novel_link/$chapter_name.html"
     chapters_folder="$novel_title/chapters/"
-    chapter_text="$chapters_folder/'$chapter_name'.txt"
+    chapter_text="$chapters_folder/$chapter_name.txt"
     [ -d "$chapters_folder" ] || mkdir "$chapters_folder"
-
+    if [ -z "$chapter_name" ];  then
+        exit
+    fi
     printf "$(curl -s "$chapter_link" | pup 'p' text{} \
 	| sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' \
         | sed '/|/d' | tail -n +2)" > "$chapter_text"
@@ -133,19 +137,25 @@ open_chapter(){
 
 next_chapter (){
 chapter_name=$(grep -w -A 1 "$chapter_name" "$novel_title/$novel_title.txt" | grep -v $chapter_name)
+if [ -z "$chapter_name" ];  then
+    err "you've reached the limit" && exit
+fi
 chapter_link="$novel_link/$chapter_name.html"
 test=$(curl -s "$chapter_link" \
     | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
-printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
+printf "$test" > "$novel_title/Chapters/$chapter_name.txt"
 $EDITOR "$novel_title/Chapters/$chapter_name.txt"
 }
 
 previous_chapter (){
 chapter_name=$(grep -w -B 1 "$chapter_name" "$novel_title/$novel_title.txt" | grep -v $chapter_name)
+if [ -z "$chapter_name" ];  then
+    err "you've reached the limit" && exit
+fi
 chapter_link="$novel_link/$chapter_name.html"
 test=$(curl -s "$chapter_link" \
     | pup 'p' text{} | sed -e '/^Novels For You, Everyday!/d' -e '/^Privacy Policy/d' -e '/^Copyright.*/d' -e '/^READLIGHTNOVELS.NET/d' -e '/^ToS/d' -e '/^Contact Us/d' | sed '/|/d' | tail -n +2)
-printf "$test" >> "$novel_title/Chapters/$chapter_name.txt"
+printf "$test" > "$novel_title/Chapters/$chapter_name.txt"
 $EDITOR "$novel_title/Chapters/$chapter_name.txt"
 }
 
@@ -154,6 +164,7 @@ search_ln
 fetch_chapters
 select_chapter
 open_chapter
+
 
 while :; do
     tput clear
